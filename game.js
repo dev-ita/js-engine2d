@@ -1,5 +1,6 @@
 import Sprite from "./sprite.js";
 import Player from "./player.js";
+import Light from "./light.js";
 
 class Game {
     constructor() {
@@ -19,19 +20,6 @@ class Game {
         this.cameraHeight = this.CANVAS_HEIGHT;
 
         this.ctx.imageSmoothingEnabled = false;
-
-        //light
-        // Crie um canvas menor para a luz pixelada
-        this.lightCanvasSmall = document.createElement("canvas");
-        this.lightCanvasSmall.width = 64;  // Pequeno para pixelar a luz
-        this.lightCanvasSmall.height = 64;
-        this.lightCtxSmall = this.lightCanvasSmall.getContext("2d");
-
-        // Crie um canvas normal para desenhar a luz final
-        this.lightCanvas = document.createElement("canvas");
-        this.lightCanvas.width = this.CANVAS_WIDTH;
-        this.lightCanvas.height = this.CANVAS_HEIGHT;
-        this.lightCtx = this.lightCanvas.getContext("2d");
 
         this.gameFrame = 0;
 
@@ -53,6 +41,9 @@ class Game {
         this.ground = new Sprite(this.ctx, new Image(), 0, 0, 16, 16, './assets/spritesheet.png');
         this.bornfire = new Sprite(this.ctx, new Image(), 0, 0, 16, 16, './assets/spritesheet.png');
         this.bush = new Sprite(this.ctx, new Image(), 0, 0, 16, 16, './assets/spritesheet.png');
+
+        // light
+        this.light = new Light(this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
 
         // 20x20
         this.map = [
@@ -113,7 +104,7 @@ class Game {
 
     drawMap = () => {
 
-        // Desenhe primeiro todo o ground
+        // desenhar primeiro todo o ground
         for (let eachRow = 0; eachRow < 20; eachRow++) {
             for (let eachCol = 0; eachCol < 20; eachCol++) {
                 this.ground.px = 16 * eachCol * Sprite.scale - this.cameraX;
@@ -122,7 +113,7 @@ class Game {
             }
         }
 
-        // Agora desenhe as sprites maiores por cima do ground
+        // desenhar as sprites maiores por cima do ground
         for (let eachRow = 0; eachRow < 20; eachRow++) {
             for (let eachCol = 0; eachCol < 20; eachCol++) {
                 let arrayIndex = eachRow * 20 + eachCol;
@@ -183,51 +174,7 @@ class Game {
         this.cameraY = this.hero.py - this.CANVAS_HEIGHT / 2 + (this.hero.height * Sprite.scale) / 2;
     }
 
-    applyLighting() {
-        // Limpe o canvas pequeno da luz
-        this.lightCtxSmall.clearRect(0, 0, this.lightCanvasSmall.width, this.lightCanvasSmall.height);
 
-        // Preencha tudo com uma cor semitransparente para simular a escuridão
-        this.lightCtxSmall.fillStyle = "rgba(0, 0, 0, 0.9)";
-        this.lightCtxSmall.fillRect(0, 0, this.lightCanvasSmall.width, this.lightCanvasSmall.height);
-
-        // Desenhe um gradiente radial de luz em torno do player
-        let lightRadius = 20;  // Menor raio para luz pixelada
-        let lightX = (this.hero.px - this.cameraX + this.hero.width / 2 + 6) / (this.CANVAS_WIDTH / this.lightCanvasSmall.width);
-        let lightY = (this.hero.py - this.cameraY + this.hero.height / 2 + 6) / (this.CANVAS_HEIGHT / this.lightCanvasSmall.height);
-
-        let gradient = this.lightCtxSmall.createRadialGradient(lightX, lightY, 0, lightX, lightY, lightRadius);
-        gradient.addColorStop(0, "rgba(255, 255, 255, 1)");  // Centro da luz (mais claro)
-        gradient.addColorStop(1, "rgba(0, 0, 0, 0)");        // Bordas (transparente)
-
-        this.lightCtxSmall.globalCompositeOperation = "destination-out";
-        this.lightCtxSmall.fillStyle = gradient;
-        this.lightCtxSmall.beginPath();
-        this.lightCtxSmall.arc(lightX, lightY, lightRadius, 0, Math.PI * 2);
-        this.lightCtxSmall.fill();
-        this.lightCtxSmall.globalCompositeOperation = "source-over";
-
-        // Adicionar um efeito de granulação para a área escura
-        this.addGrain();
-
-        // Desenhe o canvas pequeno no canvas principal ampliando-o
-        this.ctx.drawImage(this.lightCanvasSmall, 0, 0, this.lightCanvasSmall.width, this.lightCanvasSmall.height, 0, 0, this.CANVAS_WIDTH, this.CANVAS_HEIGHT);
-    }
-
-    addGrain() {
-        let grainSize = 10;  // Tamanho dos grãos menor para pixelar a granulação
-        let imageData = this.lightCtxSmall.getImageData(0, 0, this.lightCanvasSmall.width, this.lightCanvasSmall.height);
-        let pixels = imageData.data;
-
-        for (let i = 0; i < pixels.length; i += 4 * grainSize) {
-            let noise = Math.random() * 50 - 25;
-            pixels[i] = pixels[i] + noise;
-            pixels[i + 1] = pixels[i + 1] + noise;
-            pixels[i + 2] = pixels[i + 2] + noise;
-        }
-
-        this.lightCtxSmall.putImageData(imageData, 0, 0);
-    }
 
 
     draw = () => {
@@ -251,7 +198,7 @@ class Game {
         this.hero.px += this.cameraX;
         this.hero.py += this.cameraY;
 
-        this.applyLighting()
+        this.light.applyLighting(this.ctx, this.CANVAS_WIDTH, this.CANVAS_HEIGHT, this.hero, this.cameraX, this.cameraY);
     }
 
     update = (dt) => {
@@ -262,7 +209,6 @@ class Game {
         // Manter a câmera dentro dos limites do mapa
         this.cameraX = Math.max(0, Math.min(this.cameraX, this.CANVAS_WIDTH * 16 - this.cameraWidth));
         this.cameraY = Math.max(0, Math.min(this.cameraY, this.CANVAS_HEIGHT * 16 - this.cameraHeight));
-
     }
 
     run = () => {
